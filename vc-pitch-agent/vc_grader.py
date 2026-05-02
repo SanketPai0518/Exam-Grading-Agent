@@ -132,7 +132,8 @@ def grade_pitch(mp3_path: str) -> dict:
             {"role": "system", "content": "You are a helpful pitch grader."},
             {"role": "user",   "content": prompt}
         ],
-        temperature=0
+        temperature=0,
+        timeout=120,
     )
     raw = resp.choices[0].message.content
     single = raw.replace("\n", " ")

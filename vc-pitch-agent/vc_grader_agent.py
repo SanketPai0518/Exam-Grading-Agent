@@ -173,7 +173,8 @@ Audio metrics:
         ],
         tools=[{"type": "function", "function": f} for f in get_vc_pitch_functions()],
         tool_choice={"type": "function", "function": {"name": "grade_vc_pitch"}},
-        temperature=0
+        temperature=0,
+        timeout=120,
     )
     
     # Extract function call result

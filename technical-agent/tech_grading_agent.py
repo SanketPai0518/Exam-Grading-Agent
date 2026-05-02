@@ -96,6 +96,7 @@ Respond ONLY with raw JSON (no markdown):
       top_p=1,
       presence_penalty=0,
       frequency_penalty=0,
+      timeout=120,
   )
 
   # 4. Parse LLM response (strip markdown and "json" prefix)

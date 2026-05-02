@@ -128,7 +128,7 @@ def call_with_backoff(**kwargs):
     backoff = INITIAL_BACKOFF
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return client.chat.completions.create(**kwargs)
+            return client.chat.completions.create(**kwargs, timeout=120)
         except (RateLimitError, APIConnectionError, APITimeoutError) as e:
             if attempt == MAX_RETRIES:
                 raise

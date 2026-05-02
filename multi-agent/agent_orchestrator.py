@@ -204,7 +204,8 @@ def triage_exam_type(questions_text: str = "", rubric_text: str = "", input_type
                 {"role": "user", "content": combined_text}
             ],
             temperature=0,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            timeout=60,
         )
         
         result = json.loads(response.choices[0].message.content)
