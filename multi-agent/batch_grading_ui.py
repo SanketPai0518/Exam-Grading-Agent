@@ -29,8 +29,8 @@ def is_mock_mode_enabled() -> bool:
     return os.getenv("MOCK_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-if not os.getenv("OPENAI_API_KEY") and not is_mock_mode_enabled():
-    print("WARNING: OPENAI_API_KEY not found in environment. Set MOCK_MODE=true for local mock runs.")
+if not os.getenv("AZURE_OPENAI_API_KEY") and not is_mock_mode_enabled():
+    print("WARNING: AZURE_OPENAI_API_KEY not found in environment. Set MOCK_MODE=true for local mock runs.")
 
 def extract_text_from_file(file_obj):
     """Extract text from a file object (PDF, TXT, MD)."""
@@ -387,9 +387,9 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
     """
     try:
         # Check API key
-        if not os.getenv("OPENAI_API_KEY") and not is_mock_mode_enabled():
+        if not os.getenv("AZURE_OPENAI_API_KEY") and not is_mock_mode_enabled():
             return (
-                "<p style='color: red;'>Error: OPENAI_API_KEY not found. Please set it in your .env file.</p>",
+                "<p style='color: red;'>Error: AZURE_OPENAI_API_KEY not found. Please set it in your .env file.</p>",
                 "Error: API key not found",
                 {},
                 {},
