@@ -1,19 +1,21 @@
-import openai
+from openai import AzureOpenAI
 import json
 import re
 
-# 1. Set OpenAI API Key
 import os
 from dotenv import load_dotenv
-load_dotenv()   # looks for a file named “.env” in cwd
+load_dotenv()
 
 
 def is_mock_mode_enabled() -> bool:
   return os.getenv("MOCK_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-if os.getenv("OPENAI_API_KEY"):
-  openai.api_key = os.getenv("OPENAI_API_KEY")
+client = AzureOpenAI(
+  api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+  api_version="2024-06-01",
+  azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+)
 
 
 def _estimate_question_count(text: str) -> int:
@@ -39,12 +41,12 @@ def _mock_grade_result(questions_markdown: str) -> dict:
   return result
 
 # 2. Grading function (LLM-powered)
-def grade_exam(questions_markdown, answers_text, rubric_markdown=None, model="gpt-4-0125-preview"):
+def grade_exam(questions_markdown, answers_text, rubric_markdown=None, model="gpt-4o"):
   if is_mock_mode_enabled():
     return _mock_grade_result(questions_markdown)
 
-    # Prepare the prompt
-    prompt = f"""
+  # Prepare the prompt
+  prompt = f"""
 You are a grading assistant for technical exams. Your role is to evaluate student responses based on the provided questions and, if available, the rubric.
 
 ### Grading Instructions:
@@ -86,51 +88,46 @@ Respond ONLY with raw JSON (no markdown):
 {answers_text}
 """
 
-    # 3. Call OpenAI LLM
-    response = openai.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        top_p=1,
-        presence_penalty=0,
-        frequency_penalty=0,
-        # seed=42
-    )
+  # 3. Call Azure OpenAI
+  response = client.chat.completions.create(
+      model=model,
+      messages=[{"role": "user", "content": prompt}],
+      temperature=0,
+      top_p=1,
+      presence_penalty=0,
+      frequency_penalty=0,
+  )
 
-    # 4. Parse LLM response (strip markdown and "json" prefix)
-    content = response.choices[0].message.content.strip()
-    
-    # Remove markdown code blocks
-    if content.startswith("```"):
-        parts = content.split("```")
-        if len(parts) > 1:
-            content = parts[1]
-            # Remove language identifier if present (e.g., "json\n")
-            if content.startswith("json"):
-                content = content[4:].lstrip()
-            content = content.strip()
-    
-    # Remove "json" prefix if present (some models add this)
-    if content.lower().startswith("json"):
-        content = content[4:].lstrip()
-    
-    # Try to find JSON object in content
-    try:
-        result = json.loads(content)
-    except json.JSONDecodeError:
-        # Try to extract JSON from content if it's embedded in text
-        import re
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            try:
-                result = json.loads(json_match.group(0))
-            except json.JSONDecodeError:
-                print("Error: Could not parse JSON from LLM response.")
-                print("Response:", content[:500])  # Print first 500 chars
-                return {"error": "Could not parse JSON from LLM response", "raw": content[:500]}
-        else:
-            print("Error: Could not parse JSON from LLM response.")
-            print("Response:", content[:500])  # Print first 500 chars
-            return {"error": "Could not parse JSON from LLM response", "raw": content[:500]}
+  # 4. Parse LLM response (strip markdown and "json" prefix)
+  content = response.choices[0].message.content.strip()
 
-    return result
+  # Remove markdown code blocks
+  if content.startswith("```"):
+      parts = content.split("```")
+      if len(parts) > 1:
+          content = parts[1]
+          if content.startswith("json"):
+              content = content[4:].lstrip()
+          content = content.strip()
+
+  if content.lower().startswith("json"):
+      content = content[4:].lstrip()
+
+  try:
+      result = json.loads(content)
+  except json.JSONDecodeError:
+      import re
+      json_match = re.search(r'\{.*\}', content, re.DOTALL)
+      if json_match:
+          try:
+              result = json.loads(json_match.group(0))
+          except json.JSONDecodeError:
+              print("Error: Could not parse JSON from LLM response.")
+              print("Response:", content[:500])
+              return {"error": "Could not parse JSON from LLM response", "raw": content[:500]}
+      else:
+          print("Error: Could not parse JSON from LLM response.")
+          print("Response:", content[:500])
+          return {"error": "Could not parse JSON from LLM response", "raw": content[:500]}
+
+  return result

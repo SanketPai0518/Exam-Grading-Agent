@@ -1,12 +1,18 @@
 import os
 import sys
 import json
-import openai
 import librosa
 from dotenv import load_dotenv
+from openai import AzureOpenAI
 
 # Load environment variables
 load_dotenv()
+
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2024-06-01",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+)
 
 
 def is_mock_mode_enabled() -> bool:
@@ -64,8 +70,8 @@ def transcribe(mp3_path: str) -> str:
             return f.read()
 
     with open(mp3_path, "rb") as audio_file:
-        resp = openai.audio.transcriptions.create(
-            model="whisper-1",
+        resp = client.audio.transcriptions.create(
+            model="whisper",
             file=audio_file,
             response_format="text"
         )
@@ -120,7 +126,7 @@ def grade_pitch(mp3_path: str) -> dict:
     wpm, silence, transcript, duration = audio_metrics(mp3_path)
     prompt = build_prompt(transcript, wpm, silence, duration)
 
-    resp = openai.chat.completions.create(
+    resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful pitch grader."},

@@ -7,7 +7,7 @@ import pickle
 import re
 
 from dotenv import load_dotenv
-import openai
+from openai import AzureOpenAI
 import pdfplumber
 
 # Optional imports for PDF generation
@@ -22,8 +22,11 @@ except ImportError:
 # Load environment variables from .env (if present)
 load_dotenv()
 
-# Configuration: read API key from environment
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2024-06-01",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+)
 
 
 def is_mock_mode_enabled() -> bool:
@@ -125,7 +128,7 @@ def call_with_backoff(**kwargs):
     backoff = INITIAL_BACKOFF
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return openai.chat.completions.create(**kwargs)
+            return client.chat.completions.create(**kwargs)
         except (RateLimitError, APIConnectionError, APITimeoutError) as e:
             if attempt == MAX_RETRIES:
                 raise
@@ -152,7 +155,7 @@ def grade_exam(rubric: str, questions: str, responses: str) -> dict:
         user_prompt = f"Questions:\n{questions}\n\nStudent Responses:\n{responses}"
 
     resp = call_with_backoff(
-        model="gpt-4-0613",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}

@@ -5,12 +5,18 @@ Converts VC pitch grader to a true agent with structured output
 
 import os
 import json
-import openai
 import librosa
 from typing import Dict, Any
 from dotenv import load_dotenv
+from openai import AzureOpenAI
 
 load_dotenv()
+
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2024-06-01",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+)
 
 
 def is_mock_mode_enabled() -> bool:
@@ -99,8 +105,8 @@ def transcribe(mp3_path: str) -> str:
             return f.read()
 
     with open(mp3_path, "rb") as audio_file:
-        resp = openai.audio.transcriptions.create(
-            model="whisper-1",
+        resp = client.audio.transcriptions.create(
+            model="whisper",
             file=audio_file,
             response_format="text"
         )
@@ -159,7 +165,7 @@ Audio metrics:
 {RUBRIC.format(duration=duration/60)}
 """
     
-    resp = openai.chat.completions.create(
+    resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful VC pitch grader. Use the provided function to return structured scores."},

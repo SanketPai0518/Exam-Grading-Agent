@@ -11,10 +11,10 @@ This module implements a true multi-agent system with:
 import os
 import sys
 import json
-import openai
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
+from openai import AzureOpenAI
 
 # Add paths to import specialist agents (use absolute paths)
 _base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -63,7 +63,12 @@ except ImportError:
         grade_pitch = None
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2024-06-01",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+)
 
 
 def is_mock_mode_enabled() -> bool:
@@ -192,7 +197,7 @@ def triage_exam_type(questions_text: str = "", rubric_text: str = "", input_type
         if rubric_text:
             combined_text += f"Rubric:\n{rubric_text}\n"
         
-        response = openai.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": TRIAGE_PROMPT},
