@@ -96,7 +96,7 @@ def extract_pdf_to_markdown(pdf_path: str) -> str:
 
     def convert_table_to_markdown(table):
         header, *rows = table
-        md = "| " + " | ".join(header) + " |\n"
+        md = "| " + " | ".join(cell or "" for cell in header) + " |\n"
         md += "| " + " | ".join("--" for _ in header) + " |\n"
         for r in rows:
             md += "| " + " | ".join(cell or "" for cell in r) + " |\n"
