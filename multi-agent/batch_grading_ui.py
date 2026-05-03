@@ -29,6 +29,23 @@ def is_mock_mode_enabled() -> bool:
     return os.getenv("MOCK_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def friendly_error(e: Exception) -> str:
+    msg = str(e)
+    if "timed out" in msg.lower() or "timeout" in msg.lower():
+        return "Grading timed out — the document may be too large. Try splitting it into smaller sections."
+    if "401" in msg or "authentication" in msg.lower() or "api key" in msg.lower():
+        return "Azure OpenAI authentication failed — check that your API key and endpoint are correct."
+    if "404" in msg or "deployment" in msg.lower():
+        return "Model deployment not found — check that the deployment names (gpt-4o, gpt-4o-mini, whisper) exist in your Azure resource."
+    if "429" in msg or "rate limit" in msg.lower():
+        return "Rate limit hit — too many requests. Wait a moment and try again."
+    if "NoneType" in msg or "sequence item" in msg.lower():
+        return "Could not read the document — the file may be corrupted, password-protected, or in an unsupported format."
+    if "audio" in msg.lower() or "whisper" in msg.lower():
+        return "Audio transcription failed — make sure the file is a valid MP3/WAV and under 25MB."
+    return msg
+
+
 if not os.getenv("AZURE_OPENAI_API_KEY") and not is_mock_mode_enabled():
     print("WARNING: AZURE_OPENAI_API_KEY not found in environment. Set MOCK_MODE=true for local mock runs.")
 
@@ -157,9 +174,9 @@ def grade_single_student(
                     "file_type": "audio",
                     "grading_result": {},
                     "metadata": {},
-                    "error": str(e)
+                    "error": friendly_error(e)
                 }
-        
+
         # Process text input (exam grading)
         try:
             main_content = extract_text_from_file(student_file)
@@ -169,7 +186,7 @@ def grade_single_student(
                 "file_type": "text",
                 "grading_result": {},
                 "metadata": {},
-                "error": f"Failed to extract text: {str(e)}"
+                "error": friendly_error(e)
             }
         
         # Determine exam questions and student responses
@@ -268,7 +285,7 @@ def grade_single_student(
             "file_type": "unknown",
             "grading_result": {},
             "metadata": {},
-            "error": f"Unexpected error: {str(e)}"
+            "error": friendly_error(e)
         }
 
 def extract_exam_questions_from_first_file(files: List) -> Tuple[str, List]:
@@ -491,7 +508,7 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
                 status,
                 score,
                 agent,
-                error_msg[:50] + "..." if len(error_msg) > 50 else error_msg
+                error_msg
             ])
         
         # Generate HTML table
@@ -510,8 +527,10 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
             <tbody>
         """
         
-        for row in table_rows:
-            table_html += "<tr>"
+        for row, result in zip(table_rows, results):
+            has_error = result.get("error")
+            row_style = "background-color: #3a1a1a;" if has_error else ""
+            table_html += f"<tr style='{row_style}'>"
             for cell in row:
                 table_html += f"<td style='padding: 8px; border: 1px solid #555;'>{cell}</td>"
             table_html += "</tr>"
