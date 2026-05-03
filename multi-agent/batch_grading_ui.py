@@ -489,12 +489,18 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
                 
                 # Extract score
                 if "total_score" in grading_result:
-                    score = f"{grading_result['total_score']:.1f}"
+                    question_keys = [k for k in grading_result if k.startswith("question_")]
+                    max_score = len(question_keys) * 10 if question_keys else "?"
+                    score = f"{grading_result['total_score']:.1f}/{max_score}"
                 elif "overall_score" in grading_result:
-                    score = f"{grading_result['overall_score']:.1f}"
+                    score = f"{grading_result['overall_score']:.1f}/10"
                 elif "scores" in grading_result and len(grading_result["scores"]) > 0:
                     scores = [s.get("score", 0) for s in grading_result["scores"] if isinstance(s.get("score"), (int, float))]
-                    score = f"{sum(scores) / len(scores):.1f}" if scores else "N/A"
+                    max_score = len(scores) * 10
+                    score = f"{sum(scores):.1f}/{max_score}" if scores else "N/A"
+                elif all(k in grading_result for k in ["Problem", "Market", "Solution", "Delivery"]):
+                    vc_total = grading_result["Problem"] + grading_result["Market"] + grading_result["Solution"] + grading_result["Delivery"]
+                    score = f"{vc_total}/40"
                 else:
                     score = "N/A"
                 
