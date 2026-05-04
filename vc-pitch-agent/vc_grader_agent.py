@@ -5,7 +5,6 @@ Converts VC pitch grader to a true agent with structured output
 
 import os
 import json
-import librosa
 from typing import Dict, Any
 from dotenv import load_dotenv
 from openai import AzureOpenAI
@@ -117,6 +116,7 @@ def transcribe(mp3_path: str) -> str:
 
 def audio_metrics(mp3_path: str):
     """Return words-per-minute, silence ratio, transcript, duration"""
+    import librosa
     y, sr = librosa.load(mp3_path, sr=16000, mono=True)
     duration = len(y) / sr
 
