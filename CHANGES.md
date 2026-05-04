@@ -269,3 +269,69 @@ The following environment variables must be set in both the local `.env` file an
 | `vc-pitch-agent/vc_grader.py` | Azure migration, whisper model name, mock mode, timeout |
 | `multi-agent/agent_orchestrator.py` | Azure migration, PDF table header fix, triage timeout, mock mode |
 | `multi-agent/batch_grading_ui.py` | API key check fix, friendly errors, score display, VC pitch score, red error rows |
+
+
+
+## Mock Tests without api
+cd /Users/sanketsushantpai/Exam-Grading-Agent/multi-agent && \
+MOCK_MODE=true python - <<'PY'
+from agent_orchestrator import orchestrate_grading
+
+res = orchestrate_grading(
+    exam_text='Question 1: Explain normalization in databases.\nQuestion 2: Write SQL to join tables.',
+    student_response='Normalization reduces redundancy. SQL join combines rows from related tables.',
+    rubric_text='Score each question from 0-10.'
+)
+print('status:', res.get('orchestration_metadata', {}).get('status'))
+print('mock_mode:', res.get('orchestration_metadata', {}).get('mock_mode'))
+print('agent_used:', res.get('orchestration_metadata', {}).get('agent_used'))
+print('grading_keys:', list(res.get('grading_result', {}).keys())[:5])
+PY
+
+
+
+
+cd /Users/sanketsushantpai/Exam-Grading-Agent/multi-agent && \
+MOCK_MODE=true python - <<'PY'
+from agent_orchestrator import orchestrate_grading, handle_agent_failure
+
+# Technical route
+r1 = orchestrate_grading(
+    exam_text='Question 1: Write SQL JOIN query.\nQuestion 2: Explain algorithm complexity.',
+    student_response='Use INNER JOIN on key. Complexity can be O(n log n).',
+    rubric_text='Score from 0-10', enable_triage=True
+)
+
+# Narrative route
+r2 = orchestrate_grading(
+    exam_text='Question 1: Discuss leadership in uncertain markets.\nQuestion 2: Reflect on strategy tradeoffs.',
+    student_response='Leaders align teams and communicate clearly under ambiguity.',
+    rubric_text='Assess depth, reflection, and argument quality.', enable_triage=True
+)
+
+# VC pitch route
+r3 = orchestrate_grading(
+    exam_text='', student_response='', rubric_text='',
+    exam_type_override='vc_pitch', enable_triage=False, audio_file='dummy_pitch.mp3'
+)
+
+# Handoff/fallback route
+r4 = handle_agent_failure(
+    failed_exam_type='technical',
+    exam_text='Question 1: Reflect on customer adoption strategy.',
+    student_response='Adoption improves with strong onboarding and retention loops.',
+    rubric_text='Score clarity and evidence.', error='Simulated upstream error'
+)
+
+for name, res in [('technical', r1), ('narrative', r2), ('vc_pitch', r3)]:
+    meta = res.get('orchestration_metadata', {})
+    print(f"{name}: status={meta.get('status')} agent={meta.get('agent_used')} error={'error' in res.get('grading_result', {})}")
+
+print(f"handoff: error={r4.get('error')} fallback={r4.get('handoff_metadata', {}).get('fallback_agent')}")
+PY
+
+
+
+
+cd /Users/sanketsushantpai/Exam-Grading-Agent/multi-agent && \
+MOCK_MODE=true python batch_grading_ui.py
