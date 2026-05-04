@@ -231,7 +231,7 @@ def grade_single_student(
         orchestration_result = orchestrate_grading(
             exam_text=questions_md,
             student_response=student_response_md,
-            rubric_text=rubric_content if "Rubric" in rubric_content else "",
+            rubric_text=rubric_content,
             exam_type_override=None,
             enable_triage=True,
             exam_file_path=file_path

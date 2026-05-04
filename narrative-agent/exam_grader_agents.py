@@ -143,14 +143,17 @@ def grade_exam(rubric: str, questions: str, responses: str) -> dict:
 
     if rubric.strip():
         system_prompt = (
-            "You are an exam grader. Use the rubric to assign each question a numeric score (0-10) and valuable concise feedback so the student can further understand their strengths and weaknesses of the material. "
-            "Then compute the overall score as the average and provide general feedback. Return JSON."
+            "You are an exam grader. Use the rubric to assign each question a numeric score. "
+            "Each question has a maximum mark clearly stated in the rubric — you MUST NOT exceed it. "
+            "Score each question strictly within its allocated marks. "
+            "The overall_score must be the SUM of all question scores, not the average. "
+            "Provide concise feedback per question explaining the score. Return JSON."
         )
         user_prompt = f"Rubric:\n{rubric}\n\nQuestions:\n{questions}\n\nStudent Responses:\n{responses}"
     else:
         system_prompt = (
-            "You are an exam grader. The rubric is not available. Use your own criteria to assign each question a numeric score (0-10) and constructive feedback. "
-            "Then compute the overall score as the average and provide general feedback. Return JSON."
+            "You are an exam grader. No rubric is available. Use your own criteria to assign each question a score out of 10 and constructive feedback. "
+            "The overall_score must be the SUM of all question scores. Return JSON."
         )
         user_prompt = f"Questions:\n{questions}\n\nStudent Responses:\n{responses}"
 
