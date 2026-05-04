@@ -691,5 +691,6 @@ with gr.Blocks(title="Batch Multi-Agent Exam Grader") as demo:
         outputs=[student_files, rubric_file, summary_output, results_table, orchestration_metadata, individual_json_downloads, individual_pdf_downloads, combined_download]
     )
     
-    demo.launch(share=True)
+    port = int(os.getenv("PORT", 8000))
+    demo.launch(server_name="0.0.0.0", server_port=port)
 
