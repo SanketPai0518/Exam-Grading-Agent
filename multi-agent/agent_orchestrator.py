@@ -77,10 +77,34 @@ def is_mock_mode_enabled() -> bool:
 
 # ========== PDF EXTRACTION UTILITY ==========
 
+def ocr_extract_text(file_path: str) -> str:
+    """Extract text from a file using Azure Document Intelligence (handles scanned PDFs and images)."""
+    from azure.ai.documentintelligence import DocumentIntelligenceClient
+    from azure.core.credentials import AzureKeyCredential
+
+    endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+    key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+    if not endpoint or not key:
+        raise EnvironmentError("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY must be set.")
+
+    doc_client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
+
+    with open(file_path, "rb") as f:
+        poller = doc_client.begin_analyze_document("prebuilt-read", body=f, content_type="application/octet-stream")
+    result = poller.result()
+
+    lines = []
+    for page in result.pages or []:
+        for line in page.lines or []:
+            lines.append(line.content)
+        lines.append("")
+    return "\n".join(lines)
+
+
 def extract_pdf_to_markdown(pdf_path: str) -> str:
-    """Extract text from PDF and convert to markdown format."""
+    """Extract text from PDF. Uses pdfplumber for digital PDFs; falls back to Azure Document Intelligence OCR for scanned/image PDFs."""
     import pdfplumber
-    
+
     def clean_text_formatting(text: str) -> str:
         lines = text.split("\n")
         cleaned = []
@@ -110,6 +134,12 @@ def extract_pdf_to_markdown(pdf_path: str) -> str:
             out += clean_text_formatting(text)
             for tbl in page.extract_tables() or []:
                 out += "\n" + convert_table_to_markdown(tbl)
+
+    # If pdfplumber got nothing, the PDF is scanned — use OCR
+    if not out.strip():
+        print(f"pdfplumber extracted no text from {pdf_path}, falling back to Azure Document Intelligence OCR...")
+        out = ocr_extract_text(pdf_path)
+
     return out
 
 # ========== TRIAGE AGENT ==========

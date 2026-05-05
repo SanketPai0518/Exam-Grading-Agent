@@ -7,3 +7,4 @@ pdfplumber
 gradio
 fpdf
 pandas
+azure-ai-documentintelligence

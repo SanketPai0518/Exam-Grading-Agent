@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from fpdf import FPDF
 
 # Import multi-agent orchestrator
-from agent_orchestrator import extract_pdf_to_markdown, orchestrate_grading
+from agent_orchestrator import extract_pdf_to_markdown, orchestrate_grading, ocr_extract_text
 
 # Add parent directory to path to import vc_grader
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'vc-pitch-agent'))
@@ -50,20 +50,23 @@ if not os.getenv("AZURE_OPENAI_API_KEY") and not is_mock_mode_enabled():
     print("WARNING: AZURE_OPENAI_API_KEY not found in environment. Set MOCK_MODE=true for local mock runs.")
 
 def extract_text_from_file(file_obj):
-    """Extract text from a file object (PDF, TXT, MD)."""
+    """Extract text from a file object (PDF, TXT, MD, or image)."""
     if file_obj is None:
         raise ValueError("File is required")
-    
+
     file_path = file_obj.name if hasattr(file_obj, 'name') else str(file_obj)
-    
-    if file_path.endswith(".pdf"):
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == ".pdf":
         return extract_pdf_to_markdown(file_path)
-    elif file_path.endswith(".txt") or file_path.endswith(".md"):
+    elif ext in (".txt", ".md"):
         if hasattr(file_obj, 'read'):
             return file_obj.read().decode("utf-8")
         else:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
+    elif ext in (".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"):
+        return ocr_extract_text(file_path)
     else:
         return "Unsupported file format"
 
@@ -87,7 +90,7 @@ def detect_file_type(file_obj):
     
     if ext in [".mp3", ".wav", ".mp4", ".m4a", ".ogg"]:
         return "audio"
-    elif ext in [".pdf", ".txt", ".md"]:
+    elif ext in [".pdf", ".txt", ".md", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"]:
         return "text"
     return "unknown"
 
@@ -427,7 +430,7 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
         if rubric_file:
             try:
                 rubric_file_path = rubric_file.name if hasattr(rubric_file, 'name') else str(rubric_file)
-                rubric_content = extract_pdf_to_markdown(rubric_file_path) if rubric_file_path.endswith(".pdf") else extract_text_from_file(rubric_file)
+                rubric_content = extract_text_from_file(rubric_file)
             except Exception as e:
                 print(f"Warning: Could not extract rubric: {str(e)}")
         
@@ -616,12 +619,12 @@ with gr.Blocks(title="Batch Multi-Agent Exam Grader") as demo:
             student_files = gr.File(
                 label="📄 Upload Student Files (Multiple)",
                 file_count="multiple",
-                file_types=[".pdf", ".txt", ".md", ".mp3", ".wav", ".mp4"]
+                file_types=[".pdf", ".txt", ".md", ".mp3", ".wav", ".mp4", ".jpg", ".jpeg", ".png", ".tiff"]
             )
             gr.Markdown("**Single rubric applied to all students. Can also contain exam questions if not in first file.**")
             rubric_file = gr.File(
                 label="📋 Rubric (optional) - Can also contain exam questions",
-                file_types=[".pdf", ".txt", ".md"]
+                file_types=[".pdf", ".txt", ".md", ".jpg", ".jpeg", ".png", ".tiff"]
             )
             
             submit_btn = gr.Button("🚀 Grade All", variant="primary", size="lg")
