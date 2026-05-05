@@ -34,6 +34,7 @@ def _mock_grade_result(questions_markdown: str) -> dict:
     total += score
     result[f"question_{i}"] = {
       "score": score,
+      "max_mark": 10,
       "feedback": "Mock feedback: clear response structure detected; add one concrete technical example."
     }
   result["total_score"] = round(total, 2)
@@ -68,15 +69,19 @@ Respond ONLY with raw JSON (no markdown):
 {{
   "question_1": {{
     "score": X,
+    "max_mark": M,
     "feedback": "..."
   }},
   "question_2": {{
     "score": Y,
+    "max_mark": M,
     "feedback": "..."
   }},
   ...
   "total_score": Z
 }}
+
+Where max_mark is the maximum marks allocated to that question as stated in the rubric. If no rubric is provided, use 10 as the default max_mark. The total_score must be the SUM of all question scores.
 
 ### Rubric (if available):
 {rubric_markdown or "No rubric provided."}

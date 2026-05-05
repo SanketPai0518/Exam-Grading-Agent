@@ -490,10 +490,19 @@ def handle_batch_grading(student_files: List, rubric_file) -> Tuple[str, str, st
                 # Extract score
                 if "total_score" in grading_result:
                     question_keys = [k for k in grading_result if k.startswith("question_")]
-                    max_score = len(question_keys) * 10 if question_keys else "?"
+                    max_marks = [grading_result[k].get("max_mark") for k in question_keys if isinstance(grading_result[k], dict) and grading_result[k].get("max_mark") is not None]
+                    if max_marks:
+                        max_score = sum(max_marks)
+                    else:
+                        max_score = len(question_keys) * 10 if question_keys else "?"
                     score = f"{grading_result['total_score']:.1f}/{max_score}"
                 elif "overall_score" in grading_result:
-                    score = f"{grading_result['overall_score']:.1f}/10"
+                    scores_list = grading_result.get("scores", [])
+                    max_marks = [s.get("max_mark") for s in scores_list if s.get("max_mark") is not None]
+                    if max_marks:
+                        score = f"{grading_result['overall_score']:.1f}/{sum(max_marks):.1f}"
+                    else:
+                        score = f"{grading_result['overall_score']:.1f}"
                 elif "scores" in grading_result and len(grading_result["scores"]) > 0:
                     scores = [s.get("score", 0) for s in grading_result["scores"] if isinstance(s.get("score"), (int, float))]
                     max_score = len(scores) * 10
@@ -691,6 +700,6 @@ with gr.Blocks(title="Batch Multi-Agent Exam Grader") as demo:
         outputs=[student_files, rubric_file, summary_output, results_table, orchestration_metadata, individual_json_downloads, individual_pdf_downloads, combined_download]
     )
     
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 7860))
     demo.launch(server_name="0.0.0.0", server_port=port)
 

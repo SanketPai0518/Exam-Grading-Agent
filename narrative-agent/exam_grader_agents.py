@@ -96,9 +96,10 @@ def get_functions():
                             "properties": {
                                 "question_id": {"type": "integer"},
                                 "score": {"type": "number"},
+                                "max_mark": {"type": "number"},
                                 "feedback": {"type": "string"}
                             },
-                            "required": ["question_id", "score", "feedback"]
+                            "required": ["question_id", "score", "max_mark", "feedback"]
                         }
                     },
                     "overall_score": {"type": "number"},
@@ -147,6 +148,7 @@ def grade_exam(rubric: str, questions: str, responses: str) -> dict:
             "Each question has a maximum mark clearly stated in the rubric — you MUST NOT exceed it. "
             "Score each question strictly within its allocated marks. "
             "The overall_score must be the SUM of all question scores, not the average. "
+            "For each question also return max_mark — the maximum marks allocated to that question as stated in the rubric. "
             "Provide concise feedback per question explaining the score. Return JSON."
         )
         user_prompt = f"Rubric:\n{rubric}\n\nQuestions:\n{questions}\n\nStudent Responses:\n{responses}"
