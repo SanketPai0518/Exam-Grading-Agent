@@ -8,3 +8,4 @@ gradio
 fpdf
 pandas
 azure-ai-documentintelligence
+pypdf

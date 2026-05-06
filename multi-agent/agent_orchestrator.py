@@ -78,7 +78,8 @@ def is_mock_mode_enabled() -> bool:
 # ========== PDF EXTRACTION UTILITY ==========
 
 def ocr_extract_text(file_path: str) -> str:
-    """Extract text from a file using Azure Document Intelligence (handles scanned PDFs and images)."""
+    """Extract text from a file using Azure Document Intelligence (handles scanned PDFs and images).
+    For large PDFs, splits into individual pages to stay within the 4MB free-tier limit."""
     from azure.ai.documentintelligence import DocumentIntelligenceClient
     from azure.core.credentials import AzureKeyCredential
 
@@ -89,16 +90,68 @@ def ocr_extract_text(file_path: str) -> str:
 
     doc_client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
 
-    with open(file_path, "rb") as f:
-        poller = doc_client.begin_analyze_document("prebuilt-read", body=f, content_type="application/octet-stream")
-    result = poller.result()
+    MAX_BYTES = 4 * 1024 * 1024  # 4MB free-tier limit
 
-    lines = []
-    for page in result.pages or []:
-        for line in page.lines or []:
-            lines.append(line.content)
-        lines.append("")
-    return "\n".join(lines)
+    def _ocr_single(data: bytes) -> str:
+        poller = doc_client.begin_analyze_document("prebuilt-read", body=data, content_type="application/octet-stream")
+        result = poller.result()
+        lines = []
+        for page in result.pages or []:
+            for line in page.lines or []:
+                lines.append(line.content)
+            lines.append("")
+        return "\n".join(lines)
+
+    file_size = os.path.getsize(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
+
+    # For small files or images, send directly
+    if file_size <= MAX_BYTES or ext != ".pdf":
+        with open(file_path, "rb") as f:
+            return _ocr_single(f.read())
+
+    # Large PDF: split into individual pages and OCR in parallel
+    print(f"PDF is {file_size / 1024 / 1024:.1f}MB — splitting into {0} pages for parallel OCR...")
+    import tempfile
+    from pypdf import PdfReader, PdfWriter
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    reader = PdfReader(file_path)
+    total_pages = len(reader.pages)
+    print(f"PDF is {file_size / 1024 / 1024:.1f}MB — splitting into {total_pages} pages for parallel OCR...")
+
+    # Write all page temp files first
+    page_files = []
+    for page_num, page in enumerate(reader.pages, start=1):
+        writer = PdfWriter()
+        writer.add_page(page)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            writer.write(tmp)
+            page_files.append((page_num, tmp.name))
+
+    def ocr_page(args):
+        page_num, tmp_path = args
+        try:
+            with open(tmp_path, "rb") as f:
+                text = _ocr_single(f.read())
+            return page_num, f"## Page {page_num}\n{text}"
+        except Exception as e:
+            return page_num, f"## Page {page_num}\n[OCR failed: {e}]"
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(ocr_page, pf): pf[0] for pf in page_files}
+        for future in as_completed(futures):
+            page_num, text = future.result()
+            results[page_num] = text
+            print(f"  OCR complete: page {page_num}/{total_pages}")
+
+    return "\n\n".join(results[n] for n in sorted(results))
 
 
 def extract_pdf_to_markdown(pdf_path: str) -> str:
@@ -127,7 +180,9 @@ def extract_pdf_to_markdown(pdf_path: str) -> str:
         return md
 
     out = ""
+    page_count = 0
     with pdfplumber.open(pdf_path) as pdf:
+        page_count = len(pdf.pages)
         for i, page in enumerate(pdf.pages, start=1):
             out += f"\n\n## Page {i}\n"
             text = page.extract_text() or ""
@@ -135,9 +190,14 @@ def extract_pdf_to_markdown(pdf_path: str) -> str:
             for tbl in page.extract_tables() or []:
                 out += "\n" + convert_table_to_markdown(tbl)
 
-    # If pdfplumber got nothing, the PDF is scanned — use OCR
-    if not out.strip():
-        print(f"pdfplumber extracted no text from {pdf_path}, falling back to Azure Document Intelligence OCR...")
+    text_chars = len(out.strip())
+    chars_per_page = text_chars / page_count if page_count else 0
+
+    # Fall back to OCR if:
+    # - pdfplumber got nothing at all, OR
+    # - text is suspiciously sparse (< 200 chars/page) — indicates image-based PDF with only captions extracted
+    if not out.strip() or chars_per_page < 200:
+        print(f"pdfplumber extracted {text_chars} chars across {page_count} pages ({chars_per_page:.0f} chars/page) from {pdf_path} — falling back to Azure Document Intelligence OCR...")
         out = ocr_extract_text(pdf_path)
 
     return out
